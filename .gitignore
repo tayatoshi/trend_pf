@@ -1,0 +1,8 @@
+!main.tex
+!trend_pf.ipynb
+!trend_pf.py
+!UK.csv
+/main/
+.DS_Store
+/code/
+/code/.ipynb_checkpoints/

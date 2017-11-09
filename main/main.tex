@@ -1,0 +1,361 @@
+\documentclass[dvipdfmx,uplatex,aspectratio=169,12pt]{beamer}
+%-------------------------------------------------------------------
+\usetheme{CambridgeUS}
+\usecolortheme{dolphin}
+\setbeamertemplate{items}[default]
+
+\usepackage{graphicx}
+\usepackage{newtxmath}
+\usepackage{amsmath}
+\usepackage{multicol}
+\usepackage{hyperref}
+\usefonttheme{professionalfonts}
+\renewcommand{\kanjifamilydefault}{\gtdefault}
+\setbeamersize{text margin left=40pt,text margin right=40pt}
+\usepackage{pxjahyper}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{section in toc}[sections numbered]
+\setbeamertemplate{subsection in toc}[subsections numbered]
+%-------------------------------------------------------------------
+
+\title{粒子フィルタ}
+\subtitle{データ同化入門}
+\author{Toshikazu Tayanagi}
+%\institute{所属}
+\institute{ \inst{1}和田研 \and \inst{2}小暮研 \and \inst{3}村井研(SL) }
+\date{\today}
+
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+\begin{document}
+\frame{\titlepage}
+%-------------------------------------------------------------------
+\section{目次}
+\frame[allowframebreaks]{
+  \frametitle{目次}
+  \begin{multicols}{2}
+  \tableofcontents
+  \end{multicols}
+}
+%-------------------------------------------------------------------
+\section{データ同化とは}
+\frame{
+\frametitle{データ同化とは}
+シュミレーションとデータ分析を融合させたもの。\\
+\begin{itemize}
+  \item シュミレーション\\
+	初期値が正しければ正確な結果が帰ってくる。初期値さえ正しければ予測も高精度。演繹的。
+  \item データ分析\\
+	内挿的なものは得意だが外挿は苦手。手持ちのデータがこうだからデータが取得できていない状況はこうだろうという帰納的な考え方。
+\end{itemize}
+\begin{center}
+  $\Downarrow$
+\end{center}
+\begin{itemize}
+  \item データ同化\\
+	シュミレーションしたものをデータが取得されるたびに逐次的に修正する。
+\end{itemize}
+}
+%-------------------------------------------------------------------
+\section{粒子フィルタに入る前に}
+\subsection{状態空間モデル}
+\frame{
+  \frametitle{状態空間モデル}
+  粒子フィルタに入る前に僕が愛してやまない状態空間モデルについて。
+\begin{align*}
+  \alpha_{t}&=F\alpha_{t-1}+\varepsilon_{t}\\
+  y_{t}&=H\alpha_{t}+Wz_{t}+\upsilon_{t}
+\end{align*}
+(1)式が状態方程式、(2)式が観測方程式。\\
+$y$は目的変数、$z$は外性変数,$\alpha$は潜在変数、$\varepsilon$と$\upsilon$は誤差項。\\
+$\alpha$を推定する手法としてオンラインならカルマンフィルタ、オフラインならMCMCなどが有る。
+}
+%-------------------------------------------------------------------
+\subsection{カルマンフィルタ}
+\frame{
+  \frametitle{カルマンフィルタ}
+  線形ガウス状態空間モデルの推定手法の一つ。\\
+  もともとは制御系の技術。\\
+  アポロはカルマンフィルタとファミコン以下の計算能力とお金の力で月に行った。らしい。\\
+  詳しいアルゴリズムは今回はパスで。興味ある人は過去のmainチャンネルをあさってください。
+}
+%-------------------------------------------------------------------
+\subsection{粒子フィルタとは}
+\frame{
+  \frametitle{粒子フィルタとは}
+  非線形非ガウス状態空間モデルの推定手法の一つ。\\
+  データ同化の手法の一つで主に地震や津波、気象などの分析に使われることが多いと思われる。\\
+  アルゴリズム的には状態$x_{t}$の分布を粒子$x_{t}^{(i)}$とその点に対応する尤度$w_{t}^{(i)}$の集合で近似するもの。
+}
+%-------------------------------------------------------------------
+\section{粒子フィルタ}
+\subsection{粒子フィルタのメリット・デメリット}
+\frame{
+  \frametitle{粒子フィルタのメリット・デメリット}
+  \begin{itemize}
+    \item メリット\\
+    \begin{enumerate}
+      \item 非線形でも推定可能
+	  \item 非線形なモデルを微分などせず、発生させた乱数を代入するだけでなので数値計算が楽
+	  \item アルゴリズム自体はそんなに複雑じゃない
+    \end{enumerate}
+  \item デメリット
+ \begin{enumerate}
+   \item 次元が大きくなると発生させる乱数が指数的に増える
+   \item SIRの際に更新がうまく行かなくなる場合がある
+   \item 粒子数によっても結果が変わる
+ \end{enumerate}
+  \end{itemize}
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{カルマンフィルタと粒子フィルタの違い}
+  シュミレーション以外にも大きな違いが一つある。\\
+	  一期先予測からフィルタリング推定量に更新する際の挙動である。
+  \begin{itemize}
+    \item カルマンフィルタ\\
+	  一期先予測に観測値$y_{t}$と観測値の一期先予測$y_{t|t-1}$の残差にカルマンゲインと呼ばれる重みをかけたものを足すことで更新する。
+    \item 粒子フィルタ\\
+	  アンサンブルの尤度を計算し、尤度の比率で重複を許して再サンプリングをおこなう(SIR)
+  \end{itemize}
+カルマンフィルタは全体を動かすイメージ、粒子フィルタは尤度が小さいものを切り捨てること変形させるイメージ。
+}
+%-------------------------------------------------------------------
+\subsection{近似}
+\frame{
+  \frametitle{近似}
+  複雑な分布は解析的に求められないので近似することで数値計算できるようにする。
+\begin{figure}[h]
+  \begin{center}
+  \includegraphics[height=1.8cm]{pic/figure_02.png}
+  \includegraphics[height=1.8cm]{pic/figure_03.png}
+  \includegraphics[height=1.8cm]{pic/figure_04.png}\\
+  \includegraphics[height=1.8cm]{pic/figure_05.png}
+  \includegraphics[height=1.8cm]{pic/figure_06.png}
+  \includegraphics[height=1cm]{pic/figure_07.png}
+  \end{center}
+\end{figure}
+\begin{flushright}
+{\tiny 2005電子情報通信学会誌　樋口知之『粒子フィルタ』}
+\end{flushright}
+}
+%-------------------------------------------------------------------
+\subsection{アンサンブル近似}
+\frame{
+  \frametitle{アンサンブル近似(モンテカルロ近似)}
+アンサンブル近似ではある確率変数$x$の確率分布を$N$個のサンプル集合$\{x^{(i)}\}$を用いて以下の様に近似する.
+{\footnotesize
+\begin{equation*}
+  p(x) \doteq \frac{1}{N}\sum_{i=1}^{N}\delta(x-x^{(i)})
+\end{equation*}
+}
+$x$が$p(x)$に従うとき以下のように近似できる.
+{\footnotesize
+\begin{align*}
+  E[f(x)]
+  &=\int f(x)p(x)dx\\
+  &\doteq \int f(x)\left(\frac{1}{N}\sum_{i=1}^{N}\delta(x-x^{(i)})\right)dx \\
+  &=\frac{1}{N}\sum_{i=1}^{N}f(x^{(i)})
+\end{align*}
+}
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{粒子フィルタの流れ}
+  \begin{center}
+  \textcolor{blue}{[一期先予測]}\\
+  \end{center}
+  フィルタリングアンサンブル$x_{t-1|t-1}^{(i)}$と$\varepsilon_{t}^{(i)}\sim p(\varepsilon_{t})$に従うシステムノイズから予測アンサンブル$x_{t|t-1}^{(i)}$を得る。\\
+  \begin{center}
+  $\Downarrow$\\
+  \textcolor{blue}{[フィルタリング]}\\
+	フィルタンリングを行い一期先予測に重み付けする。\\
+  $\Downarrow$\\
+	\textcolor{blue}{[リサンプリング]}\\
+	尤度の比率にしたっがてSIR(Sampling importance resampling)を行い$x_{t|t}^{(i)}$を得る。\\
+  $\Downarrow$\\
+	$t-1=t$にして一期先予測に戻る
+  \end{center}
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{粒子フィルタの流れ(イメージ図)}
+\begin{figure}[h]
+  \begin{center}
+  \includegraphics[height=5cm]{pic/figure_01.png}
+  \end{center}
+\end{figure}
+\begin{flushright}
+{\tiny 2005電子情報通信学会誌　樋口知之『粒子フィルタ』}
+\end{flushright}
+}
+%-------------------------------------------------------------------
+\subsection{一期先予測}
+\frame{
+  \frametitle{一期先予測}
+  $x_{t-1|t-1}$が既知のとき以下のようになる
+  \begin{equation*}
+  x_{t|t-1}^{(i)}
+  =f_{t}(x_{t-1|t-1}^{(i)},\upsilon_{t}^{(i)}),\hspace{0.5cm}\upsilon_{t}^{(i)}\sim q_{t}(\upsilon_{t})
+\end{equation*}
+{\footnotesize
+\begin{align*}
+  p(x_{t}|y_{1:t-1})
+  &=\int p(x_{t}|x_{t-1},y_{1:t-1})p(x_{t-1}|y_{1:t-1})dx_{t-1}\\
+  &=\int p(x_{t}|x_{t-1})p(x_{t-1}|y_{1:t-1})dx_{t-1}\\
+  &=\int\left\{ \int p(x_{t},\upsilon_{t}|x_{t-1})d\upsilon_{t}\right\}p(x_{t-1}|y_{1:t-1})dx_{t-1}\\
+  &=\int\left\{ \int p(x_{t}|x_{t-1},\upsilon_{t})p(\upsilon_{t}|x_{t-1})d\upsilon_{t}\right\}p(x_{t-1}|y_{1:t-1})dx_{t-1}\\
+  &=\int \int p(x_{t}|x_{t-1},\upsilon_{t})p(\upsilon_{t}|x_{t-1})p(x_{t-1}|y_{1:t-1})dx_{t-1}d\upsilon_{t}
+\end{align*}
+  }
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{一期先予測}
+  {\footnotesize
+  \begin{align*}
+	p(x_{t}|y_{1:t-1})
+  &\doteq
+  \frac{1}{N}\sum_{i=1}^{N}\int \int p(x_{t}|x_{t-1},\upsilon_{t})\delta\left(
+	\left(
+\begin{array}{c}
+  x_{t-1}\\
+  \upsilon_{t}
+\end{array}
+  \right)
+  -\left(
+	\begin{array}{c}
+	x_{t-1|t-1}^{(i)}\\
+	\upsilon_{t}^{(i)}
+  \end{array}
+  \right)
+\right)dx_{t-1}d\upsilon_{t}\\
+&=\frac{1}{N}\sum_{i=1}^{N}p\left(x_{t}|x_{t-1}=x_{t-1|t-1}^{(i)},\upsilon_{t}=\upsilon_{t}^{(i)}\right)
+\end{align*}
+    }
+$x_{t-1}$と$\upsilon_{t}$を与えると$x_{t}$は一点に決まるので、
+{\footnotesize
+\begin{align*}
+  p(x_{t}|y_{1:t-1})
+  &\doteq \frac{1}{N}\sum_{i=1}^{N}\delta\left(x_{t}-f_{t}(x_{t-1|t-1}^{(i)},\upsilon_{t}^{(i)}) \right)\\
+  &= \frac{1}{N}\sum_{i=1}^{N}\delta(x_{t}-x_{t|t-1}^{(i)})
+\end{align*}
+}
+}
+%-------------------------------------------------------------------
+\subsection{フィルタリング}
+\frame{
+  \frametitle{フィルタリング}
+  {\footnotesize
+  \begin{align*}
+  p(x_{t}|y_{1:t})
+  &=\frac{p(y_{t}|x_{t})p(x_{t}|y_{1:t-1})}{\int p(y_{t}|x_{t})p(x_{t}|y_{1:t-1})dx_{t}}\\
+  &\doteq \frac{p(y_{t}|x_{t})\frac{1}{N}\sum_{i}^{N}\delta(x_{t}-x_{t|t-1}^{(i)})}{\int p(y_{t}|x_{t})\frac{1}{N}\sum_{j}^{N}\delta(x_{t}-x_{t|t-1}^{(j)})dx_{t}}\\
+  &=\frac{1}{\sum_{j=1}^{N}p(y_{t}|x_{t|t-1}^{(j)})}\sum_{i=1}^{N}p(y_{t}|x_{t|t-1}^{(i)})\delta(x_{t}-x_{t|t-1}^{(i)})\\
+  &=\frac{1}{\sum_{j=1}^{N}\lambda_{t}^{(j)}}\sum_{i=1}^{N}\lambda_{t}^{(i)}\delta(x_{t}-x_{t|t-1}^{(i)})\\
+  \end{align*}
+}
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{フィルタリング(つづき)}
+  {\footnotesize
+  \begin{align*}
+  p(x_{t}|y_{1:t})
+  &=\sum_{i=1}^{N}\frac{1}{\sum_{j=1}^{N}\lambda_{t}^{(j)}}\lambda_{t}^{(i)}\delta(x_{t}-x_{t|t-1}^{(i)})\\
+  &=\sum_{i=1}^{N}\beta_{t}^{(i)}\delta(x_{t}-x_{t|t-1}^{(i)})
+\end{align*}
+}
+$\beta$の確率で重複を許してリサンプリングする(SIR)
+}
+%-------------------------------------------------------------------
+\section{実装}
+\frame{
+  \frametitle{実装してみた}
+  モデルは以下である。
+\begin{align*}
+  \alpha_{t}&=
+  \begin{pmatrix}
+	\alpha_{0,t} \\
+	\alpha_{1,t}
+  \end{pmatrix}=
+\begin{pmatrix}
+  1&1 \\
+	0&1
+  \end{pmatrix}
+\begin{pmatrix}
+	\alpha_{0,t-1} \\
+	\alpha_{1,t-1}
+  \end{pmatrix}+
+  \upsilon_{t}&\mbox{[状態方程式]}\\
+  y_{t} &= \alpha_{t}+\omega_{t}&\mbox{[観測方程式]}\\
+  \upsilon_{t}&\sim N\left( 0,
+\begin{pmatrix}
+  R&0\\
+  0&0
+\end{pmatrix}\right)\\
+  \omega&\sim N(0,\sigma^{2})
+\end{align*}
+粒子数はそれぞれ10,000。初期値は
+\begin{align*}
+  a0_{0|0}^{(i)}&\sim N(7,1)\\
+  a1_{0|0}^{(i)}&\sim N(0,0.1)
+\end{align*}
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{頑張って実装した}
+  線形ガウスでトレンドとレベルを持つモデル。パラメータはRMSEが最小になるものを選んだ。つもり。\\
+  推定結果は$\hat{R}=0,\hat{\sigma^{2}}=7.1$
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{頑張って実装した}
+  レベルとトレンドの粒子と推定値
+\begin{figure}[h]
+  \begin{center}
+  \includegraphics[height=3cm]{pic/level.png}
+  \includegraphics[height=3cm]{pic/trend.png}
+  \end{center}
+\end{figure}
+}
+%-------------------------------------------------------------------
+\frame{
+  \frametitle{頑張って実装した}
+  観測値と推定と予測。
+\begin{figure}[h]
+  \begin{center}
+  \includegraphics[height=4.5cm]{pic/figure_08.png}
+  \end{center}
+\end{figure}
+}
+%-------------------------------------------------------------------
+\section{補題}
+\frame{
+  \frametitle{補題}
+  デルタ関数
+  \begin{align*}
+  \delta(x)&=
+  \begin{cases}
+	+\infty(x=0)\\
+	0(x\neq 0)
+  \end{cases}\\
+  \int_{-\infty}^{\infty}\delta (x) dx&=1\\
+  \int_{-\infty}^{\infty}f(x)\delta (x)dx&=f(0)\\
+  \int_{-\infty}^{\infty}f(x)\delta(x-a)dx&=f(a)
+\end{align*}
+}
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+%-------------------------------------------------------------------
+\end{document}
